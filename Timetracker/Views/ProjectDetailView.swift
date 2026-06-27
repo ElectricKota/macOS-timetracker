@@ -76,35 +76,51 @@ struct ProjectDetailView: View {
 
     // MARK: - Časovač
 
+    /// Právě běžící záznam, pokud patří tomuto projektu.
+    private var runningEntry: TimeEntry? {
+        timer.isRunning(project) ? timer.activeEntry : nil
+    }
+
     private var timerCard: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(project.client?.name ?? "—")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("\(Format.money(project.effectiveRate))/h"
-                     + (project.hourlyRateOverride == nil ? " (zděděno)" : ""))
-                    .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(project.client?.name ?? "—")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("\(Format.money(project.effectiveRate))/h"
+                         + (project.hourlyRateOverride == nil ? " (zděděno)" : ""))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if timer.isRunning(project) {
+                        Text(Format.hms(timer.elapsed))
+                            .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
+                    } else {
+                        Text("0:00:00")
+                            .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
                 if timer.isRunning(project) {
-                    Text(Format.hms(timer.elapsed))
-                        .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
+                    Button(role: .destructive) { timer.stop() } label: {
+                        Label("Zastavit", systemImage: "stop.fill").padding(6)
+                    }
+                    .controlSize(.large)
                 } else {
-                    Text("0:00:00")
-                        .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                    Button { timer.start(project) } label: {
+                        Label("Spustit", systemImage: "play.fill").padding(6)
+                    }
+                    .controlSize(.large)
+                    .buttonStyle(.borderedProminent)
                 }
             }
-            Spacer()
-            if timer.isRunning(project) {
-                Button(role: .destructive) { timer.stop() } label: {
-                    Label("Zastavit", systemImage: "stop.fill").padding(6)
-                }
-                .controlSize(.large)
-            } else {
-                Button { timer.start(project) } label: {
-                    Label("Spustit", systemImage: "play.fill").padding(6)
-                }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+
+            if let entry = runningEntry {
+                TextField("Na čem děláš?", text: Binding(
+                    get: { entry.note },
+                    set: { entry.note = $0 }
+                ), axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...3)
             }
         }
         .padding(18)
