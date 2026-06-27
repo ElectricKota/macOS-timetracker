@@ -7,11 +7,36 @@ struct ProjectsColumn: View {
     @Bindable var client: Client
     @Binding var selection: PersistentIdentifier?
 
+    // Seznamy řídíme přes @Query, ne přes procházení vazby `client.projects` –
+    // @Query se spolehlivě překreslí při každé změně v databázi.
+    @Query(sort: \Project.name) private var allProjects: [Project]
+    @Query private var allEntries: [TimeEntry]
+
     @State private var editingProject: Project?
     @State private var showingNew = false
 
+    private var clientID: PersistentIdentifier { client.persistentModelID }
+
     private var projects: [Project] {
-        client.projects.sorted { $0.name < $1.name }
+        allProjects.filter { $0.client?.persistentModelID == clientID }
+    }
+
+    private func openAmount(of project: Project) -> Double {
+        allEntries
+            .filter { $0.project?.persistentModelID == project.persistentModelID && !$0.isInvoiced }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    private var clientEntries: [TimeEntry] {
+        allEntries.filter { $0.project?.client?.persistentModelID == clientID }
+    }
+
+    private var unbilled: Double {
+        clientEntries.filter { !$0.isInvoiced }.reduce(0) { $0 + $1.amount }
+    }
+
+    private var invoiced: Double {
+        clientEntries.filter { $0.isInvoiced }.reduce(0) { $0 + $1.amount }
     }
 
     var body: some View {
@@ -27,7 +52,7 @@ struct ProjectsColumn: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    let open = project.openEntries.reduce(0) { $0 + $1.amount }
+                    let open = openAmount(of: project)
                     if open > 0 {
                         Text(Format.money(open))
                             .font(.caption).foregroundStyle(.secondary)
@@ -65,12 +90,12 @@ struct ProjectsColumn: View {
             HStack {
                 Text("Nevyfakturováno").foregroundStyle(.secondary)
                 Spacer()
-                Text(Format.money(client.unbilledAmount)).fontWeight(.medium)
+                Text(Format.money(unbilled)).fontWeight(.medium)
             }
             HStack {
                 Text("Vyfakturováno").foregroundStyle(.secondary)
                 Spacer()
-                Text(Format.money(client.invoicedAmount))
+                Text(Format.money(invoiced))
             }
         }
         .font(.callout)

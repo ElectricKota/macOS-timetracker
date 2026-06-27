@@ -6,16 +6,25 @@ struct ProjectDetailView: View {
     @Environment(TimerManager.self) private var timer
     @Bindable var project: Project
 
+    // Seznamy přes @Query, ať se nový čas i fakturace projeví okamžitě.
+    @Query private var allEntries: [TimeEntry]
+
     @State private var editingEntry: TimeEntry?
     @State private var editingProject = false
     @State private var showInvoiceConfirm = false
 
-    private var openEntries: [TimeEntry] { project.openEntries }
+    private var projectEntries: [TimeEntry] {
+        allEntries.filter { $0.project?.persistentModelID == project.persistentModelID }
+    }
+
+    private var openEntries: [TimeEntry] {
+        projectEntries.filter { !$0.isInvoiced }.sorted { $0.start > $1.start }
+    }
 
     private var invoices: [Invoice] {
         var seen = Set<PersistentIdentifier>()
         var result: [Invoice] = []
-        for entry in project.entries where entry.isInvoiced {
+        for entry in projectEntries where entry.isInvoiced {
             if let inv = entry.invoice, seen.insert(inv.persistentModelID).inserted {
                 result.append(inv)
             }
@@ -25,7 +34,7 @@ struct ProjectDetailView: View {
 
     /// Lze fakturovat jen uzavřené, dosud nevyfakturované záznamy.
     private var invoiceableCount: Int {
-        project.entries.filter { !$0.isInvoiced && $0.end != nil }.count
+        projectEntries.filter { !$0.isInvoiced && $0.end != nil }.count
     }
 
     var body: some View {
